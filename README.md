@@ -1,6 +1,6 @@
 ## Eks Refarch Cloudformation
 
-An Automated solution to build EKS environment to deploy containerized microservices with Amazon EKS and AWS CloudFormation.
+An Automated solution which builds EKS environment to deploy containerized microservices with Amazon EKS and AWS CloudFormation.
 
 ## License Summary
 
