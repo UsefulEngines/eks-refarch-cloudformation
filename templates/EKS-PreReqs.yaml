@@ -218,7 +218,7 @@ Outputs:
     Description: All subnets in the VPC
     Value: !Join [ ",", [ !Ref Subnet01, !Ref Subnet02, !Ref Subnet03 ] ]
 
-  SecurityGroups:
+  SecurityGroup:
     Description: Security group for the cluster control plane communication with worker nodes
     Value: !Join [ ",", [ !Ref ControlPlaneSecurityGroup ] ]
 
