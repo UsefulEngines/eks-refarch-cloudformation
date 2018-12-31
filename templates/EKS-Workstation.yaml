@@ -1,0 +1,331 @@
+---
+AWSTemplateFormatVersion: '2010-09-09'
+Description: 'Amazon EKS Template to create WorkStation EC2 Server'
+
+Parameters:
+  EKSRbacRoleArn:
+    Description: Importing EKSRbacRoleArn from Parent EKS Infrastructure template
+    Type: String
+  
+  EKSMaster:
+    Description: Importing EKSMaster from Parent EKS Infrastructure template
+    Type: String
+
+  EKSMasterEndpoint:
+    Description: Importing EKSMasterEndpoint from Parent EKS Infrastructure template
+    Type: String
+
+  EKSMasterCertificateAuthorityData:
+    Description: Importing EKSMasterCertificateAuthorityData from Parent EKS Infrastructure template
+    Type: String
+  
+  NodeInstanceRoleArn:
+    Description: Importing NodeInstanceRoleArn from Parent EKS Infrastructure template
+    Type: String
+
+  VpcId:
+    Description: Importing VpcId from Parent EKS Infrastructure template
+    Type: String
+
+  SSHLocation:
+    Description: Importing SSHLocation from Parent EKS Infrastructure template
+    Type: String
+
+  WorkStationSubnet:
+    Description: Importing WorkStationSubnet from Parent EKS Infrastructure template
+    Type: String
+
+  KeyName:
+    Description: Importing KeyName from Parent EKS Infrastructure template
+    Type: String
+
+  NodeImageId:
+    Description: Importing NodeImageId from Parent EKS Infrastructure template
+    Type: String
+
+  EKSRbacRole:
+    Description: Importing EKSRbacRole from Parent EKS Infrastructure template
+    Type: String
+
+Resources:
+  WorkStationInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref WorkStationInstanceRole
+
+  WorkStationInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+        - Effect: Allow
+          Principal:
+            Service:
+            - ec2.amazonaws.com
+          Action:
+          - sts:AssumeRole
+
+  WorkStationIAMPolicy:
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyName: !Sub 'WorkStationIAMPolicy-${EKSMaster}'
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          -
+            Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Resource: !Ref EKSRbacRoleArn
+          -
+            Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Resource: !GetAtt ExtraInstanceRole.Arn
+      Roles: 
+        - 
+          Ref: "WorkStationInstanceRole"
+
+  #WorkStationIAMPolicy02 is to give WorkstationEC2 instance required permissions to make API calls. Once the setup is done, this policy will be deleted/detached. Refer to line 322.
+  WorkStationIAMPolicy2:
+    Type: AWS::IAM::Policy
+    Properties: 
+      PolicyName: !Sub 'WorkStationIAMPolicy02-${EKSMaster}'
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          -
+            Effect: "Allow"
+            Action: "*"
+            Resource: "*"
+      Roles: 
+        - 
+          Ref: "WorkStationInstanceRole"
+
+  ExtraInstanceProfile:
+    Type: AWS::IAM::InstanceProfile
+    Properties:
+      Path: "/"
+      Roles:
+      - !Ref ExtraInstanceRole
+
+  ExtraInstanceRole:
+    Type: AWS::IAM::Role
+    Properties:
+      AssumeRolePolicyDocument:
+        Version: '2012-10-17'
+        Statement:
+          -
+            Effect: Allow
+            Principal:
+              Service:
+                - ec2.amazonaws.com
+            Action:
+            - sts:AssumeRole
+          -
+            Effect: Allow
+            Principal:
+              AWS:
+                - !GetAtt WorkStationInstanceRole.Arn
+            Action:
+            - sts:AssumeRole
+
+  ExtraIAMPolicy:
+    Type: AWS::IAM::Policy
+    Properties:
+      PolicyName: !Sub 'ExtraIAMPolicy-${EKSMaster}'
+      PolicyDocument: 
+        Version: "2012-10-17"
+        Statement: 
+          -
+            Effect: "Allow"
+            Action: "sts:AssumeRole"
+            Resource: !Ref EKSRbacRoleArn           
+      Roles: 
+        - 
+          Ref: "ExtraInstanceRole"
+
+  WorkStationSecurityGroup:
+    Type: 'AWS::EC2::SecurityGroup'
+    Properties:
+        GroupDescription: Enable HTTP access via port 80 locked down to the load balancer + SSH access
+        VpcId:
+            Ref: VpcId
+        SecurityGroupIngress:
+            - 
+                IpProtocol: tcp
+                FromPort: '1025'
+                ToPort: '65535'
+                CidrIp: 0.0.0.0/0
+            - 
+                IpProtocol: tcp
+                FromPort: '22'
+                ToPort: '22'
+                CidrIp:
+                    Ref: SSHLocation
+                    
+  WorkStation2:
+    Type: 'AWS::EC2::Instance'
+    Properties:
+      IamInstanceProfile: !Ref WorkStationInstanceProfile
+      ImageId: !Ref NodeImageId
+      InstanceType: "t2.medium"
+      SubnetId: !Ref WorkStationSubnet
+      KeyName: !Ref KeyName
+      SecurityGroupIds:
+      - !Ref WorkStationSecurityGroup
+      Tags:
+      - Key: Name
+        Value: "WorkStationServer-EKS"
+      - Key: !Sub 'kubernetes.io/cluster/${EKSMaster}'
+        Value: 'owned'
+      BlockDeviceMappings:
+        - DeviceName: /dev/xvda
+          Ebs:
+            VolumeSize: "20"
+            VolumeType: gp2
+            DeleteOnTermination: true
+      UserData:
+        Fn::Base64:
+          !Sub |
+            #!/bin/bash -x
+            HOME=/home/ec2-user
+
+            #Writes logging of my userdata to /var/log/user-data.log file
+            exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
+
+            # Install kubectl
+            curl -o kubectl https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/kubectl
+            chmod +x kubectl && mv kubectl /usr/local/bin/
+            echo 'export PATH=/usr/local/bin/:$PATH' >> $HOME/.bashrc
+
+            # Install Heptio Authenticator
+            curl -o aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/aws-iam-authenticator
+            chmod +x ./aws-iam-authenticator && mv aws-iam-authenticator /usr/local/bin/
+            echo 'export PATH=/usr/local/bin/:$PATH' >> $HOME/.bashrc
+
+            #Configure kubectl
+            mkdir $HOME/.kube
+            curl -o $HOME/.kube/config-${EKSMaster} https://raw.githubusercontent.com/srinivasreddych/test1/master/config-eks.yaml
+            #curl -o $HOME/.kube/config-${EKSMaster} https://raw.githubusercontent.com/aws-samples/eks-refarch-cloudformation/master/configuration/config-eks.yaml
+            #aws s3 cp s3://ekstemplates/config-eks.yaml $HOME/.kube/config-${EKSMaster}
+
+            sed -i -e "s#<endpoint-url>#${EKSMasterEndpoint}#g" $HOME/.kube/config-${EKSMaster}
+            sed -i -e "s#<base64-encoded-ca-cert>#${EKSMasterCertificateAuthorityData}#g" $HOME/.kube/config-${EKSMaster}
+            sed -i -e "s#<cluster-name>#${EKSMaster}#g" $HOME/.kube/config-${EKSMaster}
+            sed -i -e "s#<role-arn>#${EKSRbacRoleArn}#g" $HOME/.kube/config-${EKSMaster}
+            echo 'export KUBECONFIG=$KUBECONFIG:$HOME/.kube/config-${EKSMaster}' >> $HOME/.bashrc
+            chown -R ec2-user:ec2-user $HOME/.kube
+            source $HOME/.bashrc
+
+            #TrustRelationship logic between WorkStationInstance and EKSRbacRole
+            cat <<EOF > $HOME/Role-Trust-Policy.json
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "cloudformation.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                },
+                {
+                    "Effect": "Allow",
+                    "Principal": {
+                        "AWS": [
+                          "${WorkStationInstanceRole.Arn}"
+                        ]
+                    },
+                    "Action": "sts:AssumeRole"
+                }
+              ]
+            }
+            EOF
+
+            #Set trust between WorkStationInstance and EKSRbacRole
+            aws iam update-assume-role-policy --role-name ${EKSRbacRole} --policy-document file://$HOME/Role-Trust-Policy.json
+            
+            #Configure ConfigMap for attaching Worker nodes
+            curl -o $HOME/.kube/aws-auth-cm.yaml https://raw.githubusercontent.com/srinivasreddych/test1/master/aws-auth-cm.yaml
+            #curl -o $HOME/.kube/aws-auth-cm.yaml https://raw.githubusercontent.com/aws-samples/eks-refarch-cloudformation/master/configuration/aws-auth-cm.yaml
+            #curl https://s3.amazonaws.com/ekstemplates/aws-auth-cm.yaml > $HOME/.kube/aws-auth-cm.yaml
+            sed -i -e "s#<ARN of instance role (not instance profile)>#${NodeInstanceRoleArn}#g" $HOME/.kube/aws-auth-cm.yaml
+
+            #Configure ConfigMap with an ExtraInstanceRole which we will use it later for achieving security.
+            sed -i -e "s#<ARN of additional instance role>#${ExtraInstanceRole.Arn}#g" $HOME/.kube/aws-auth-cm.yaml
+            sleep 0.5m
+            kubectl apply -f $HOME/.kube/aws-auth-cm.yaml
+
+            #For achieving security, detach the TrustRelationship between WorkStation EC2 Instance and RBAC Role.
+            cat <<EOF > $HOME/UnSetRole-Trust-Policy.json
+            {
+              "Version": "2012-10-17",
+              "Statement": [
+                {
+                  "Effect": "Allow",
+                  "Principal": {
+                    "Service": "cloudformation.amazonaws.com"
+                  },
+                  "Action": "sts:AssumeRole"
+                }
+              ]
+            }
+            EOF
+            aws iam update-assume-role-policy --role-name ${EKSRbacRole} --policy-document file://$HOME/UnSetRole-Trust-Policy.json
+
+            #Setting the ExtraInstanceRole in Kubectl configmap
+            sed -i -e "s#${EKSRbacRoleArn}#${ExtraInstanceRole.Arn}#g" $HOME/.kube/config-${EKSMaster}
+
+            #Installing Kubernetes dashboard
+            cat > $HOME/eks-admin-service-account.yaml << EOF 
+            {
+                "apiVersion": "v1",
+                "kind": "ServiceAccount",
+                "metadata": {
+                    "name": "eks-admin",
+                    "namespace": "kube-system"
+                }
+            }
+            EOF
+
+            kubectl apply -f $HOME/eks-admin-service-account.yaml
+
+            cat > $HOME/eks-admin-cluster-role-binding.yaml << EOF  
+            {
+                "apiVersion": "rbac.authorization.k8s.io/v1beta1",
+                "kind": "ClusterRoleBinding",
+                "metadata": {
+                    "name": "eks-admin"
+                },
+                "roleRef": {
+                    "apiGroup": "rbac.authorization.k8s.io",
+                    "kind": "ClusterRole",
+                    "name": "cluster-admin"
+                },
+                "subjects": [
+                {
+                    "kind": "ServiceAccount",
+                    "name": "eks-admin",
+                    "namespace": "kube-system"
+                }
+                ]
+            }
+            EOF
+
+            kubectl apply -f $HOME/eks-admin-cluster-role-binding.yaml
+
+            #Deploy Official Kubernetes dashboard. If the below link gets outdated, refer to "https://github.com/kubernetes/dashboard" for working link.
+            kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+            
+            #Run Kube-proxy in the background to proxy our requests to the dashboard service
+            kubectl proxy --port=8080 --address='0.0.0.0' --disable-filter=true &
+            
+            #Delete/Detach extra privilege from the WorkstationEC2 role.
+            aws iam delete-role-policy --role-name ${WorkStationInstanceRole} --policy-name WorkStationIAMPolicy2-${EKSMaster}
+
+            /opt/aws/bin/cfn-signal --exit-code $? \
+                    --stack  ${AWS::StackName} \
+                    --resource WorkStation  \
+                    --region ${AWS::Region}
