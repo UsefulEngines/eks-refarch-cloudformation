@@ -11,21 +11,31 @@ Parameters:
     Description: The EC2 Key Pair to allow SSH access to the instances
     Type: AWS::EC2::KeyPair::KeyName
 
-  SSHLocation:
-    Description: Enter the SSH CIDR for entering into workstation
+  SSHCidr:
+    Description: Enter the CIDR from which you can SSH into the Workstation.
     Type: String
     
-  EKSRbacRoleArn:
-    Description: EKSRbacRoleARN which will be added to kubectl config file
+  CFNServiceRoleArn:
+    Description: CFNServiceRoleARN which will be added to kubectl config file
     Type: String
 
-  EKSRbacRole:
-    Description: EKSRbacRole which will be used to get assumed by WorkStationInstance
+  CFNServiceRole:
+    Description: CFNServiceRole which will be used to get assumed by WorkStationInstance
     Type: String
     
   NodeImageId:
     Type: AWS::EC2::Image::Id
     Description: AMI id for the node instances. Please check https://docs.aws.amazon.com/eks/latest/userguide/eks-optimized-ami.html for AMI ID
+
+  KubectlBinarylink: 
+    Type: String
+    Description: Kubectl binary location published by AWS EKS team. Please check https://docs.aws.amazon.com/eks/latest/userguide/install-kubectl.html for latest version of binary. The default value is the one recommended at the moment of creating the solution.
+    Default: https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/kubectl
+  
+  AwsIamAuthenticatorBinaryLink:
+    Type: String
+    Description: aws-iam-authenticator binary location published by AWS EKS team. Please check https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html for latest version of binary. The default value is the one recommended at the moment of creating the solution.
+    Default: https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/aws-iam-authenticator
 
   NodeInstanceType:
     Description: EC2 instance type for the node instances
@@ -204,9 +214,9 @@ Metadata:
         Label:
           default: "WorkStation EC2 Configuration"
         Parameters:
-          - EKSRbacRole
-          - EKSRbacRoleArn
-          - SSHLocation
+          - CFNServiceRole
+          - CFNServiceRoleArn
+          - SSHCidr
           - WorkStationSubnet
 
 Conditions: 
@@ -381,19 +391,19 @@ Resources:
     Properties:
       TemplateURL: https://s3.amazonaws.com/eks-refarch-cloudformation/EKS-Workstation.yaml
       Parameters:
-        EKSRbacRoleArn: !Ref EKSRbacRoleArn
+        CFNServiceRoleArn: !Ref CFNServiceRoleArn
         EKSMaster: !Ref EKSMaster
-        EKSMasterEndpoint: !GetAtt EKSMaster.Endpoint
-        EKSMasterCertificateAuthorityData: !GetAtt EKSMaster.CertificateAuthorityData
         NodeInstanceRoleArn: !GetAtt NodeInstanceRole.Arn
         VpcId: !Ref VpcId
-        SSHLocation: !Ref SSHLocation
+        SSHCidr: !Ref SSHCidr
         WorkStationSubnet: !Ref WorkStationSubnet
         KeyName: !Ref KeyName
         NodeImageId: !Ref NodeImageId
-        EKSRbacRole: !Ref EKSRbacRole
+        CFNServiceRole: !Ref CFNServiceRole
+        KubectlBinarylink: !Ref KubectlBinarylink
+        AwsIamAuthenticatorBinaryLink: !Ref AwsIamAuthenticatorBinaryLink
 
 Outputs:
   NodeInstanceRole:
-    Description: The node instance role
+    Description: The Worker nodes instance IAM role
     Value: !GetAtt NodeInstanceRole.Arn
