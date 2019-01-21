@@ -1,4 +1,4 @@
-## Eks Refarch Cloudformation
+## EKS Reference Architecture Cloudformation
 
 An Automated solution which builds EKS environment to deploy containerized microservices with Amazon EKS and AWS CloudFormation.
 
