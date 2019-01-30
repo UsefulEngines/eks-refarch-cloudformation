@@ -389,7 +389,7 @@ Resources:
     Condition: WorkStationCreation
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/eks-refarch-cloudformation/EKS-Workstation.yaml
+      TemplateURL: https://s3.amazonaws.com/eks-refarch-cloudformation/EKS-ClusterManagementNode.yaml
       Parameters:
         CFNServiceRoleArn: !Ref CFNServiceRoleArn
         EKSMaster: !Ref EKSMaster
