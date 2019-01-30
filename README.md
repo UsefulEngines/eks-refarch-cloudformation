@@ -5,7 +5,7 @@ An Automated solution which builds EKS environment to deploy containerized micro
 
 ### Customize the templates
 
-1. [Fork](https://github.com/awslabs/eks-refarch-cloudformation#fork-destination-box) this GitHub repository.
+1. [Fork](https://github.com/aws-samples/eks-refarch-cloudformation) this GitHub repository.
 2. Clone the forked GitHub repository to your local machine.
 3. Modify the templates.
 4. Upload them to an Amazon S3 bucket of your choice.
