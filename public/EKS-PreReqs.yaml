@@ -248,7 +248,11 @@ Outputs:
     Description: All subnets in the VPC
     Value: !Join [ ",", [ !Ref Subnet01, !Ref Subnet02, !Ref Subnet03 ] ]
 
+<<<<<<< HEAD:public/EKS-PreReqs.yaml
   ControlPlaneSecurityGroup:
+=======
+  SecurityGroup:
+>>>>>>> master:templates/EKS-PreReqs.yaml
     Description: Security group for the cluster control plane communication with worker nodes
     Value: !Join [ ",", [ !Ref ControlPlaneSecurityGroup ] ]
 
@@ -264,6 +268,12 @@ Outputs:
     Description: The IAM Role will be used to create AWS resources like EKS Master and Worker Nodes in EKS Infrastructure template. This will be recorded in the K8sRBAC.
     Value: !Ref CFNServiceRole
   
+<<<<<<< HEAD:public/EKS-PreReqs.yaml
   CFNServiceRoleArn:
     Description: The IAM Role will be used to create AWS resources like EKS Master and Worker Nodes in EKS Infrastructure template. This will be recorded in the K8sRBAC.
     Value: !GetAtt CFNServiceRole.Arn
+=======
+  EKSRbacRoleArn:
+    Description: The role that EKS CloudFormation template will use to create AWS resources like EKS Master and Worker Nodes. This will be added in the EKS RBAC table.
+    Value: !GetAtt EKSRbacRole.Arn
+>>>>>>> master:templates/EKS-PreReqs.yaml
