@@ -1,6 +1,6 @@
 ## EKS Reference Architecture CloudFormation
 
-An Automated solution which builds EKS Cluster and joins Amazon EKS worker nodes with the control plane to deploy containerized microservices with AWS CloudFormation.
+An Automated solution which builds Amazon EKS Cluster and joins Amazon EKS worker nodes with the control plane to deploy containerized microservices with AWS CloudFormation.
 
 ## Overview
 
