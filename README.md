@@ -2,6 +2,10 @@
 
 An Automated solution which builds EKS environment to deploy containerized microservices with Amazon EKS and AWS CloudFormation.
 
+## Overview
+
+![infrastructure-overview](images/architecture-overview.png)
+
 
 ### Customize the templates
 
