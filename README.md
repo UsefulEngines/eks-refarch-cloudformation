@@ -1,4 +1,4 @@
-## EKS Reference Architecture Cloudformation
+## EKS Reference Architecture CloudFormation
 
 An Automated solution which builds EKS environment to deploy containerized microservices with Amazon EKS and AWS CloudFormation.
 
