@@ -171,7 +171,7 @@ Resources:
         - arn:aws:iam::aws:policy/AmazonEKSServicePolicy
         - arn:aws:iam::aws:policy/AmazonEKSClusterPolicy
   
-  EKSRbacRolePolicy:
+  CFNServiceRolePolicy:
     Type: AWS::IAM::Policy
     Properties: 
       PolicyName: "root"
@@ -180,26 +180,56 @@ Resources:
         Statement: 
           - 
             Effect: "Allow"
-            Action: "eks:*"
+            Action:
+            - "eks:*"
             Resource: "*"
           - 
             Effect: "Allow"
-            Action: "ec2:*"
+            Action: 
+            - "ec2:Create*"
+            - "ec2:Describe*"
+            - "ec2:List*"
+            - "ec2:AuthorizeSecurity*"
+            - "ec2:RevokeSecurity*"
+            - "ec2:UpdateSecurity*"
+            - "ec2:DeleteSecurityGroup*"
+            - "ec2:RunInstances"
             Resource: "*"
           - 
             Effect: "Allow"
-            Action: "iam:*"
+            Action: 
+            - "iam:Create*"
+            - "iam:List*"
+            - "iam:Add*"
+            - "iam:Attach*"
+            - "iam:Detach*"
+            - "iam:Get*"
+            - "iam:Tag*"
+            - "iam:Update*"
+            - "iam:PassRole"
+            - "iam:PutRole*"
+            - "iam:DeleteRole*"
+            - "iam:RemoveRole*"
+            - "iam:DeleteInstanceProfile"
             Resource: "*"
           - 
             Effect: "Allow"
-            Action: "autoscaling:*"
+            Action: 
+            - "autoscaling:Create*"
+            - "autoscaling:Describe*"
+            - "autoscaling:Update*"
+            - "autoscaling:Attach*"
+            - "autoscaling:Put*"
+            - "autoscaling:Set*"
+            - "autoscaling:DeleteLaunchConfiguration"
+            - "autoscaling:DeleteAutoScalingGroup"
             Resource: "*"
       Roles: 
         - 
-          Ref: "EKSRbacRole"
+          Ref: "CFNServiceRole"
 
-  #EKSRbacRole will be used as a CloudFormation Service role to create EKS Master.
-  EKSRbacRole:
+  #CFNServiceRole will be used as a CloudFormation Service role to create EKS Master and Worker nodes.
+  CFNServiceRole:
     Type: AWS::IAM::Role
     Properties:
       AssumeRolePolicyDocument:
@@ -218,7 +248,11 @@ Outputs:
     Description: All subnets in the VPC
     Value: !Join [ ",", [ !Ref Subnet01, !Ref Subnet02, !Ref Subnet03 ] ]
 
+<<<<<<< HEAD:public/EKS-PreReqs.yaml
+  ControlPlaneSecurityGroup:
+=======
   SecurityGroup:
+>>>>>>> master:templates/EKS-PreReqs.yaml
     Description: Security group for the cluster control plane communication with worker nodes
     Value: !Join [ ",", [ !Ref ControlPlaneSecurityGroup ] ]
 
@@ -227,13 +261,19 @@ Outputs:
     Value: !Ref VPC
 
   EKSServiceRoleArn:
-    Description: The role that EKS will use to create AWS resources for Kubernetes clusters
+    Description: The IAM Role that EKS will use to create AWS resources for Kubernetes clusters
     Value: !GetAtt EKSServiceRole.Arn
 
-  EKSRbacRole:
-    Description: The role that EKS CloudFormation template will use to create AWS resources like EKS Master and Worker Nodes. This will be added in the EKS RBAC table.
-    Value: !Ref EKSRbacRole
+  CFNServiceRole:
+    Description: The IAM Role will be used to create AWS resources like EKS Master and Worker Nodes in EKS Infrastructure template. This will be recorded in the K8sRBAC.
+    Value: !Ref CFNServiceRole
   
+<<<<<<< HEAD:public/EKS-PreReqs.yaml
+  CFNServiceRoleArn:
+    Description: The IAM Role will be used to create AWS resources like EKS Master and Worker Nodes in EKS Infrastructure template. This will be recorded in the K8sRBAC.
+    Value: !GetAtt CFNServiceRole.Arn
+=======
   EKSRbacRoleArn:
     Description: The role that EKS CloudFormation template will use to create AWS resources like EKS Master and Worker Nodes. This will be added in the EKS RBAC table.
     Value: !GetAtt EKSRbacRole.Arn
+>>>>>>> master:templates/EKS-PreReqs.yaml

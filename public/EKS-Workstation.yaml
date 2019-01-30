@@ -3,20 +3,12 @@ AWSTemplateFormatVersion: '2010-09-09'
 Description: 'Amazon EKS Template to create WorkStation EC2 Server'
 
 Parameters:
-  EKSRbacRoleArn:
-    Description: Importing EKSRbacRoleArn from Parent EKS Infrastructure template
+  CFNServiceRoleArn:
+    Description: Importing CFNServiceRoleArn from Parent EKS Infrastructure template
     Type: String
   
   EKSMaster:
     Description: Importing EKSMaster from Parent EKS Infrastructure template
-    Type: String
-
-  EKSMasterEndpoint:
-    Description: Importing EKSMasterEndpoint from Parent EKS Infrastructure template
-    Type: String
-
-  EKSMasterCertificateAuthorityData:
-    Description: Importing EKSMasterCertificateAuthorityData from Parent EKS Infrastructure template
     Type: String
   
   NodeInstanceRoleArn:
@@ -27,8 +19,8 @@ Parameters:
     Description: Importing VpcId from Parent EKS Infrastructure template
     Type: String
 
-  SSHLocation:
-    Description: Importing SSHLocation from Parent EKS Infrastructure template
+  SSHCidr:
+    Description: Importing SSHCidr from Parent EKS Infrastructure template
     Type: String
 
   WorkStationSubnet:
@@ -43,8 +35,20 @@ Parameters:
     Description: Importing NodeImageId from Parent EKS Infrastructure template
     Type: String
 
-  EKSRbacRole:
-    Description: Importing EKSRbacRole from Parent EKS Infrastructure template
+  CFNServiceRole:
+    Description: Importing CFNServiceRole from Parent EKS Infrastructure template
+    Type: String
+
+  KubectlBinarylink:
+    Description: Importing KubectlBinarylink from Parent EKS Infrastructure template
+    Type: String
+  
+  AwsIamAuthenticatorBinaryLink:
+    Description: Importing AwsIamAuthenticatorBinaryLink from Parent EKS Infrastructure template
+    Type: String
+  
+  k8sDashboardlink:
+    Description: Importing k8sDashboardlink from Parent EKS Infrastructure template
     Type: String
 
 Resources:
@@ -78,7 +82,7 @@ Resources:
           -
             Effect: "Allow"
             Action: "sts:AssumeRole"
-            Resource: !Ref EKSRbacRoleArn
+            Resource: !Ref CFNServiceRoleArn
           -
             Effect: "Allow"
             Action: "sts:AssumeRole"
@@ -87,7 +91,6 @@ Resources:
         - 
           Ref: "WorkStationInstanceRole"
 
-  #WorkStationIAMPolicy02 is to give WorkstationEC2 instance required permissions to make API calls. Once the setup is done, this policy will be deleted/detached. Refer to line 322.
   WorkStationIAMPolicy2:
     Type: AWS::IAM::Policy
     Properties: 
@@ -97,7 +100,12 @@ Resources:
         Statement: 
           -
             Effect: "Allow"
-            Action: "*"
+            Action: 
+              - "iam:PassRole"
+              - "eks:DescribeCluster"
+              - "iam:Update*"
+              - "iam:List*"
+              - "sts:AssumeRole"
             Resource: "*"
       Roles: 
         - 
@@ -141,7 +149,7 @@ Resources:
           -
             Effect: "Allow"
             Action: "sts:AssumeRole"
-            Resource: !Ref EKSRbacRoleArn           
+            Resource: !Ref CFNServiceRoleArn           
       Roles: 
         - 
           Ref: "ExtraInstanceRole"
@@ -149,7 +157,7 @@ Resources:
   WorkStationSecurityGroup:
     Type: 'AWS::EC2::SecurityGroup'
     Properties:
-        GroupDescription: Enable HTTP access via port 80 locked down to the load balancer + SSH access
+        GroupDescription: This security group will be associated with WorkStation Instance.
         VpcId:
             Ref: VpcId
         SecurityGroupIngress:
@@ -163,9 +171,9 @@ Resources:
                 FromPort: '22'
                 ToPort: '22'
                 CidrIp:
-                    Ref: SSHLocation
+                    Ref: SSHCidr
                     
-  WorkStation2:
+  WorkStation:
     Type: 'AWS::EC2::Instance'
     Properties:
       IamInstanceProfile: !Ref WorkStationInstanceProfile
@@ -196,30 +204,23 @@ Resources:
             exec > >(tee /var/log/user-data.log|logger -t user-data -s 2>/dev/console) 2>&1
 
             # Install kubectl
-            curl -o kubectl https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/kubectl
+            curl -o kubectl ${KubectlBinarylink}
             chmod +x kubectl && mv kubectl /usr/local/bin/
             echo 'export PATH=/usr/local/bin/:$PATH' >> $HOME/.bashrc
 
-            # Install Heptio Authenticator
-            curl -o aws-iam-authenticator https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/aws-iam-authenticator
+            # Install aws-iam-authenticator
+            curl -o aws-iam-authenticator ${AwsIamAuthenticatorBinaryLink}
             chmod +x ./aws-iam-authenticator && mv aws-iam-authenticator /usr/local/bin/
             echo 'export PATH=/usr/local/bin/:$PATH' >> $HOME/.bashrc
 
             #Configure kubectl
-            mkdir $HOME/.kube
-            curl -o $HOME/.kube/config-${EKSMaster} https://raw.githubusercontent.com/srinivasreddych/test1/master/config-eks.yaml
-            #curl -o $HOME/.kube/config-${EKSMaster} https://raw.githubusercontent.com/aws-samples/eks-refarch-cloudformation/master/configuration/config-eks.yaml
-            #aws s3 cp s3://ekstemplates/config-eks.yaml $HOME/.kube/config-${EKSMaster}
-
-            sed -i -e "s#<endpoint-url>#${EKSMasterEndpoint}#g" $HOME/.kube/config-${EKSMaster}
-            sed -i -e "s#<base64-encoded-ca-cert>#${EKSMasterCertificateAuthorityData}#g" $HOME/.kube/config-${EKSMaster}
-            sed -i -e "s#<cluster-name>#${EKSMaster}#g" $HOME/.kube/config-${EKSMaster}
-            sed -i -e "s#<role-arn>#${EKSRbacRoleArn}#g" $HOME/.kube/config-${EKSMaster}
+            mkdir $HOME/.kube 
+            aws eks update-kubeconfig --name ${EKSMaster} --role-arn ${CFNServiceRoleArn} --region ${AWS::Region} && chown ec2-user:ec2-user /root/.kube/* && mv /root/.kube/config /root/.kube/config-${EKSMaster} && mv /root/.kube/config-${EKSMaster} /home/ec2-user/.kube/
             echo 'export KUBECONFIG=$KUBECONFIG:$HOME/.kube/config-${EKSMaster}' >> $HOME/.bashrc
             chown -R ec2-user:ec2-user $HOME/.kube
             source $HOME/.bashrc
 
-            #TrustRelationship logic between WorkStationInstance and EKSRbacRole
+            #TrustRelationship logic between WorkStationInstance and CFNServiceRole
             cat <<EOF > $HOME/Role-Trust-Policy.json
             {
               "Version": "2012-10-17",
@@ -244,13 +245,11 @@ Resources:
             }
             EOF
 
-            #Set trust between WorkStationInstance and EKSRbacRole
-            aws iam update-assume-role-policy --role-name ${EKSRbacRole} --policy-document file://$HOME/Role-Trust-Policy.json
+            #Set trust between WorkStationInstance and CFNServiceRole
+            aws iam update-assume-role-policy --role-name ${CFNServiceRole} --policy-document file://$HOME/Role-Trust-Policy.json
             
             #Configure ConfigMap for attaching Worker nodes
-            curl -o $HOME/.kube/aws-auth-cm.yaml https://raw.githubusercontent.com/srinivasreddych/test1/master/aws-auth-cm.yaml
-            #curl -o $HOME/.kube/aws-auth-cm.yaml https://raw.githubusercontent.com/aws-samples/eks-refarch-cloudformation/master/configuration/aws-auth-cm.yaml
-            #curl https://s3.amazonaws.com/ekstemplates/aws-auth-cm.yaml > $HOME/.kube/aws-auth-cm.yaml
+            curl -o $HOME/.kube/aws-auth-cm.yaml https://raw.githubusercontent.com/aws-samples/eks-refarch-cloudformation/master/configuration/aws-auth-cm.yaml
             sed -i -e "s#<ARN of instance role (not instance profile)>#${NodeInstanceRoleArn}#g" $HOME/.kube/aws-auth-cm.yaml
 
             #Configure ConfigMap with an ExtraInstanceRole which we will use it later for achieving security.
@@ -273,59 +272,26 @@ Resources:
               ]
             }
             EOF
-            aws iam update-assume-role-policy --role-name ${EKSRbacRole} --policy-document file://$HOME/UnSetRole-Trust-Policy.json
+            aws iam update-assume-role-policy --role-name ${CFNServiceRole} --policy-document file://$HOME/UnSetRole-Trust-Policy.json
 
             #Setting the ExtraInstanceRole in Kubectl configmap
-            sed -i -e "s#${EKSRbacRoleArn}#${ExtraInstanceRole.Arn}#g" $HOME/.kube/config-${EKSMaster}
+            sed -i -e "s#${CFNServiceRoleArn}#${ExtraInstanceRole.Arn}#g" $HOME/.kube/config-${EKSMaster}
 
-            #Installing Kubernetes dashboard
-            cat > $HOME/eks-admin-service-account.yaml << EOF 
-            {
-                "apiVersion": "v1",
-                "kind": "ServiceAccount",
-                "metadata": {
-                    "name": "eks-admin",
-                    "namespace": "kube-system"
-                }
-            }
-            EOF
-
-            kubectl apply -f $HOME/eks-admin-service-account.yaml
-
-            cat > $HOME/eks-admin-cluster-role-binding.yaml << EOF  
-            {
-                "apiVersion": "rbac.authorization.k8s.io/v1beta1",
-                "kind": "ClusterRoleBinding",
-                "metadata": {
-                    "name": "eks-admin"
-                },
-                "roleRef": {
-                    "apiGroup": "rbac.authorization.k8s.io",
-                    "kind": "ClusterRole",
-                    "name": "cluster-admin"
-                },
-                "subjects": [
-                {
-                    "kind": "ServiceAccount",
-                    "name": "eks-admin",
-                    "namespace": "kube-system"
-                }
-                ]
-            }
-            EOF
-
-            kubectl apply -f $HOME/eks-admin-cluster-role-binding.yaml
+            #Creating "view" level permissions for accessing Kubernetes Dashboard
+            curl -o $HOME/eks-view-service-account.yaml https://raw.githubusercontent.com/aws-samples/eks-refarch-cloudformation/master/configuration/k8sdashboard-view.yaml
+            kubectl apply -f $HOME/eks-view-service-account.yaml
 
             #Deploy Official Kubernetes dashboard. If the below link gets outdated, refer to "https://github.com/kubernetes/dashboard" for working link.
-            kubectl apply -f https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+            kubectl apply -f ${k8sDashboardlink}
+            until kubectl get pods -n kube-system -l k8s-app=kubernetes-dashboard | grep 1/1; do sleep 1; done
             
-            #Run Kube-proxy in the background to proxy our requests to the dashboard service
-            kubectl proxy --port=8080 --address='0.0.0.0' --disable-filter=true &
-            
-            #Delete/Detach extra privilege from the WorkstationEC2 role.
-            aws iam delete-role-policy --role-name ${WorkStationInstanceRole} --policy-name WorkStationIAMPolicy2-${EKSMaster}
+            #Deploy Heapster and Influxdb backend for heapster cluster
+            kubectl apply -f https://raw.githubusercontent.com/kubernetes/heapster/master/deploy/kube-config/influxdb/heapster.yaml
+            kubectl apply -f https://raw.githubusercontent.com/kubernetes/heapster/master/deploy/kube-config/influxdb/influxdb.yaml
+            kubectl apply -f https://raw.githubusercontent.com/kubernetes/heapster/master/deploy/kube-config/rbac/heapster-rbac.yaml
 
-            /opt/aws/bin/cfn-signal --exit-code $? \
-                    --stack  ${AWS::StackName} \
-                    --resource WorkStation  \
-                    --region ${AWS::Region}
+      
+Outputs:
+  WorkStation:
+    Description: The Worker nodes instance IAM role
+    Value: !GetAtt WorkStation.PublicIp
