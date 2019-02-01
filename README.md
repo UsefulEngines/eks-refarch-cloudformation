@@ -24,7 +24,7 @@ Overview of the "private/*" directory:
 2. Clone the forked GitHub repository to your local machine.
 3. Modify the templates as per your usecase. If you modify the nested stack, then upload them to an Amazon S3 bucket of your choice and update the S3 URL in "EKS-Infra.yaml" template.
 4. Update your existing stack with your version of the templates.
-5. To achieve better IAM permissions, you can move all the IAM Roles into the "EKS-PreREqs.yaml" template and create resource based IAM policies.   
+5. To achieve better IAM permissions, you can move all the IAM Roles into the "EKS-PreReqs.yaml" template and create resource based IAM policies.   
 
 ## License Summary
 
