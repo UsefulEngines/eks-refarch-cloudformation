@@ -37,6 +37,11 @@ Parameters:
     Description: aws-iam-authenticator binary location published by AWS EKS team. Please check https://docs.aws.amazon.com/eks/latest/userguide/getting-started.html for latest version of binary. The default value is the one recommended at the moment of creating the solution.
     Default: https://amazon-eks.s3-us-west-2.amazonaws.com/1.11.5/2018-12-06/bin/linux/amd64/aws-iam-authenticator
 
+  k8sDashboardlink:
+    Type: String
+    Description: k8sDashboard link. The below default link is working at the moment of publishing the solution, please check "https://github.com/kubernetes/dashboard" for future.
+    Default: https://raw.githubusercontent.com/kubernetes/dashboard/v1.10.1/src/deploy/recommended/kubernetes-dashboard.yaml
+
   NodeInstanceType:
     Description: EC2 instance type for the node instances
     Type: String
@@ -218,6 +223,10 @@ Metadata:
           - CFNServiceRoleArn
           - SSHCidr
           - WorkStationSubnet
+          - KubectlBinarylink
+          - AwsIamAuthenticatorBinaryLink
+          - k8sDashboardlink
+
 
 Conditions: 
   WorkStationCreation: !Equals [ !Ref WorkStationCreation, yes ]      
@@ -389,7 +398,7 @@ Resources:
     Condition: WorkStationCreation
     Type: AWS::CloudFormation::Stack
     Properties:
-      TemplateURL: https://s3.amazonaws.com/eks-refarch-cloudformation/EKS-ClusterManagementNode.yaml
+      TemplateURL: https://s3.amazonaws.com/eks-refarch-cloudformation/EKS-Workstation.yaml
       Parameters:
         CFNServiceRoleArn: !Ref CFNServiceRoleArn
         EKSMaster: !Ref EKSMaster
@@ -402,6 +411,7 @@ Resources:
         CFNServiceRole: !Ref CFNServiceRole
         KubectlBinarylink: !Ref KubectlBinarylink
         AwsIamAuthenticatorBinaryLink: !Ref AwsIamAuthenticatorBinaryLink
+        k8sDashboardlink: !Ref k8sDashboardlink
 
 Outputs:
   NodeInstanceRole:
